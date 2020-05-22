@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroids</title>
+
+    <script src="js/ship.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/bullet.js"></script>
+    <script src="js/asteroidBelt.js"></script>
+    <script src="js/asteroid.js"></script>
+    <script src="js/intersection.js"></script>
+
+</head>
+<body>
+    
+    <div id="gameBoard"></div>
+
+    <script>
+
+        //--------------          Initialize Game             ---------------------//
+        
+        const max_bullets = 5;
+        const number_of_level = 3;
+        const text_display_duration = 100;
+        const bullet_explode_time = 2;
+
+        let bullets = [];
+        let text;
+        let shipThrusting, shipRotatingRight, shipRotatingLeft;
+
+        const gameBoard = new Game(document.getElementById("gameBoard"));
+        gameBoard.initGame();
+        
+        const ship = new Ship(gameBoard.canvas.width, gameBoard.canvas.height);
+        ship.render();
+
+        const asteroidBelt = new AsteroidBelt();
+        asteroidBelt.create(ship);
+
+        document.body.addEventListener("keydown", handleKeyDown); 
+        document.body.addEventListener("keyup", handleKeyUp);
+
+
+        //--------------                 GameLoop             ---------------------//
+        //setInterval(update, 1000 / 30); -- alternative method to set the game loop
+        update();
+
+        function update() {
+            //------- update objects   ----------// 
+            ship.update();
+            asteroidBelt.update();
+
+            if (bullets.length !== 0) {
+                for(let i = 0; i < bullets.length; i++){
+                    bullets[i].update();
+                    if(bullets[i].statSelfDestroy === true || (bullets[i].explodingTime === 0 && bullets[i].statExploding === true)) {
+                        bullets.splice(i,1);
+                    }
+                }
+            }
+
+            //------- check keyEvents   ----------//
+            pressedKeys();
+
+
+            //------- check collision   ----------//
+            if(!ship.statExploding) {          
+                for(let i = 0; i < asteroidBelt.asteroids.length; i++) {
+                    //improve performance: check first the rough collision with the Circle Collision method -- only then go into the detailed intersection (Separate Axis Theorem)
+                    if(Utils.distBetweenPoints(ship.x, ship.y, asteroidBelt.asteroids[i].x, asteroidBelt.asteroids[i].y) < asteroidBelt.asteroids[i].r + ship.r) {
+                        checkShipIntersection(i);
+                    }
+                }
+            }    
+             
+            for(let i = 0; i < bullets.length; i++) {
+                for(let j = 0; j < asteroidBelt.asteroids.length; j++) {
+                    if(Utils.distBetweenPoints(bullets[i].x, bullets[i].y, asteroidBelt.asteroids[j].x, asteroidBelt.asteroids[j].y) < asteroidBelt.asteroids[j].r + bullets[i].r) {
+                        checkBulletIntersection(i,j);
+                    }      
+                }
+            }
+
+            if(asteroidBelt.asteroids.length === 0){
+                if(gameBoard.level < number_of_level){
+                    gameBoard.level++;
+                    gameBoard.textDisplay = text_display_duration;
+                    text = "Level " + gameBoard.level;
+                    asteroidBelt.quantity +=2;
+                    asteroidBelt.create(ship);
+                }
+                else{
+                    ship.visibility = false;
+                    gameBoard.textDisplay = text_display_duration;
+                    text = "Game Won"
+                }
+            }
+
+            //------- draw objects   ----------//
+            gameBoard.render();
+            if(ship.visibility) ship.render();
+            if(gameBoard.textDisplay>0) gameBoard.message(text);
+
+            asteroidBelt.render();
+            if (bullets.length !== 0) {
+                for(let i = 0; i < bullets.length; i++){
+                    bullets[i].render();
+                }
+            }
+
+            window.requestAnimationFrame(update);
+        }
+
+
+        //--------------          Handle Events             ---------------------//
+        function handleKeyDown(e) {
+            switch(e.keyCode) {
+                case 32:                                         //space bar (shoot bullets) 
+                    if(bullets.length < max_bullets){
+                        bullets.push(new Bullet(ship.getPosTip().x, ship.getPosTip().y, ship.angle));
+                    } 
+                    break;                 
+                case 37:  shipRotatingRight = true;    break;      //left arrow key (rotate ship left) 
+                case 38:  shipThrusting = true;        break;      //up arrow key (thrust ship forward)
+                case 39:  shipRotatingLeft = true;     break;     //right arrow key (rotate ship right) 
+            }
+        }
+
+        function handleKeyUp(e) {
+            switch(e.keyCode) {
+                case 32:                                break;
+                case 37:   shipRotatingRight = false;   break;                                         
+                case 38:   shipThrusting = false;       break;                          
+                case 39:   shipRotatingLeft = false;    break;                                                                                              
+            }
+        }
+
+
+        function pressedKeys() {
+            shipRotatingRight ? ship.rotate(1) : ship.rotate(0);
+            shipRotatingLeft ?  ship.rotate(-1): ship.rotate(0);
+            shipThrusting ? ship.statThrusting = true : ship.statThrusting = false;
+        }
+
+
+        //--------------          Handle Collision             ---------------------//
+        function checkShipIntersection(i) {
+            if(intersect(asteroidBelt.asteroids[i].coordinates, ship.coordinates).length > 0) {
+                        ship.exploding();
+                        document.body.removeEventListener("keydown", handleKeyDown); 
+                        document.body.removeEventListener("keyup", handleKeyUp);
+                        asteroidBelt.destroy(asteroidBelt.asteroids[i], i);
+
+                        if(gameBoard.lives.length > 0){
+                            setTimeout(newLive, 2000);
+                            gameBoard.lives.pop();
+                            //break;
+                        }
+                        else{
+                            ship.visibility = false;
+                            gameBoard.textDisplay = text_display_duration;
+                            text = "Game Over";
+                        }
+
+                    }
+        }
+
+        function checkBulletIntersection(i,j) {
+            if(intersect(bullets[i].coordinates, asteroidBelt.asteroids[j].coordinates).length > 0) {
+                        asteroidBelt.destroy(asteroidBelt.asteroids[j], j);                        
+                        bullets[i].statExploding = true;
+                        bullets[i].explodingTime = bullet_explode_time;
+                        bullets[i].velocity = 0;
+                        //break;
+                    }
+        }
+
+
+        
+        function newLive() {
+            ship.newShip(gameBoard.canvas.width, gameBoard.canvas.height);
+            bullets = [];
+            document.body.addEventListener("keydown", handleKeyDown); 
+            document.body.addEventListener("keyup", handleKeyUp);
+        }
+
+
+    </script>
+</body>
+</html>
