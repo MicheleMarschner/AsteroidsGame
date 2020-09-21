@@ -1,5 +1,9 @@
 # Game: Asteroids 
 
+![Asteroids Game - picture](https://user-images.githubusercontent.com/49597398/93791591-bac20d80-fc34-11ea-9c0e-c73a992c8830.jpeg)
+
+[For the Live Demo click here](https://asteroids-game-def783.netlify.app)
+
 **Goal:** Practice Javascript skills, game logic and OOP (by using modules and classes) <br/>
 **Helpful Resources:** MDN-Web Documentation, tutorials from FreeCodeCamp, CodePen, New Think Tank and Plunker as well as dyn4j (regarding Separating Axis Theorem) and a open source polygons intersection algorithm on GitHub by vrd and kottans.org
 
